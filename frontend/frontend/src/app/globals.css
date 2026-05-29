@@ -1,0 +1,272 @@
+/* ───────────────────────── Google Fonts — Void Whisper type system ───────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Amatic+SC:wght@400;700&family=Quicksand:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ───────────────────────── Tailwind theme mapping ───────────────────────── */
+@theme inline {
+  --font-sans: 'Quicksand', system-ui, sans-serif;
+  --font-mono: 'Courier Prime', ui-monospace, monospace;
+  --font-display: 'Amatic SC', serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-surface: var(--surface);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 2px);
+}
+
+/* ───────────────────────── Void Whisper — CSS custom properties ───────────────────────── */
+:root, .dark {
+  /* Raw Void Whisper palette */
+  --void-deep:#07070f;
+  --void-base:#0a0a14;
+  --void-raised:#0f0f1e;
+  --void-hover:#16162a;
+  --void-border:rgba(200,200,220,0.08);
+  --void-border-active:rgba(200,200,220,0.18);
+  --whisper-primary:#e0e0e0;
+  --whisper-secondary:#b8b8cc;
+  --whisper-muted:#6a6a80;
+  --whisper-ghost:#3a3a50;
+  --moth-glow:rgba(200,200,220,0.06);
+  --silk-accent:#c8c8dc;
+  --ink-shadow:rgba(0,0,0,0.6);
+  --soul-pulse:rgba(220,220,240,0.4);
+
+  --f-display:'Amatic SC', serif;
+  --f-ui:'Quicksand', system-ui, sans-serif;
+  --f-mono:'Courier Prime', ui-monospace, monospace;
+
+  /* shadcn / Tailwind semantic tokens → mapped to Void Whisper */
+  --background: var(--void-base);
+  --foreground: var(--whisper-primary);
+
+  --surface: var(--void-raised);
+
+  --card: var(--void-raised);
+  --card-foreground: var(--whisper-primary);
+
+  --popover: var(--void-raised);
+  --popover-foreground: var(--whisper-primary);
+
+  --primary: var(--silk-accent);
+  --primary-foreground: var(--void-deep);
+
+  --secondary: var(--void-hover);
+  --secondary-foreground: var(--whisper-primary);
+
+  --muted: var(--whisper-muted);
+  --muted-foreground: var(--whisper-secondary);
+
+  --accent: var(--silk-accent);
+  --accent-foreground: var(--void-deep);
+
+  --destructive: #d29a9a;
+  --destructive-foreground: var(--void-deep);
+
+  --success: #aac4b2;
+
+  --border: var(--void-border);
+  --input: var(--void-border);
+  --ring: var(--void-border-active);
+
+  --radius: 8px;
+}
+
+/* ───────────────────────── Base layer ───────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    /* Fluid root scale — the whole UI (text + rem-based spacing) sizes up
+       on large laptops/monitors so it no longer looks "zoomed out",
+       while never dropping below a comfortable 16px on small screens. */
+    font-size: clamp(16px, 1.1vw, 19px);
+  }
+  html, body {
+    @apply h-[100dvh] w-full overflow-hidden;
+  }
+  body {
+    @apply antialiased;
+    background: var(--void-deep);
+    color: var(--whisper-secondary);
+    font-family: var(--f-ui);
+    font-weight: 400;
+    font-size: 0.875rem;
+    letter-spacing: 0.2px;
+    scroll-behavior: smooth;
+  }
+  button { cursor: default; }
+  :focus { outline: none; }
+  :focus-visible {
+    box-shadow: 0 0 0 2px rgba(200,200,220,0.15);
+    border-radius: 6px;
+  }
+}
+
+/* ───────────────────────── Scrollbars — thin & silken ───────────────────────── */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--void-hover); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--void-border-active); }
+* { scrollbar-width: thin; scrollbar-color: var(--void-hover) transparent; }
+
+/* ───────────────────────── Ambient atmosphere ───────────────────────── */
+.void-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 22%, rgba(200,200,220,0.045) 0%, transparent 60%);
+}
+
+.moth-field {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+.moth {
+  position: absolute;
+  top: 0; left: 0;
+  width: 2px; height: 2px;
+  border-radius: 50%;
+  background: var(--silk-accent);
+  opacity: 0;
+  filter: blur(0.4px);
+  box-shadow: 0 0 6px rgba(200,200,220,0.5);
+}
+@keyframes mothDrift1 {
+  0%   { transform: translate(-5vw,90vh) scale(0.6); opacity: 0; }
+  10%  { opacity: 0.08; }
+  50%  { opacity: 0.05; }
+  90%  { opacity: 0.07; }
+  100% { transform: translate(105vw,-10vh) scale(0.9); opacity: 0; }
+}
+@keyframes mothDrift2 {
+  0%   { transform: translate(110vw,10vh) scale(0.7); opacity: 0; }
+  15%  { opacity: 0.06; }
+  60%  { opacity: 0.04; }
+  100% { transform: translate(-10vw,90vh) scale(0.5); opacity: 0; }
+}
+@keyframes mothDrift3 {
+  0%   { transform: translate(40vw,110vh) scale(0.5); opacity: 0; }
+  20%  { opacity: 0.05; }
+  100% { transform: translate(60vw,-10vh) scale(0.8); opacity: 0; }
+}
+.moth.m1 { animation: mothDrift1 38s linear infinite; }
+.moth.m2 { animation: mothDrift2 46s linear infinite; animation-delay: -12s; }
+.moth.m3 { animation: mothDrift3 52s linear infinite; animation-delay: -30s; }
+
+/* ───────────────────────── Animations ───────────────────────── */
+/* Soul pulse — status dots */
+@keyframes soulPulse {
+  0%,100% { opacity: 0.3; box-shadow: 0 0 0 0 rgba(220,220,240,0.18); }
+  50%     { opacity: 0.8; box-shadow: 0 0 0 4px rgba(220,220,240,0); }
+}
+.pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--soul-pulse);
+  animation: soulPulse 2.5s ease-in-out infinite;
+}
+
+/* Fade-in stagger */
+@keyframes whisperIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.whisper-in { animation: whisperIn 0.5s ease-out both; }
+
+/* Typing dots */
+@keyframes typingPulse {
+  0%,60%,100% { opacity: 0.2; transform: translateY(0); }
+  30%         { opacity: 1; transform: translateY(-2px); }
+}
+.type-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--silk-accent); display: inline-block;
+}
+.type-dot:nth-child(1) { animation: typingPulse 1.2s ease-in-out infinite 0s; }
+.type-dot:nth-child(2) { animation: typingPulse 1.2s ease-in-out infinite 0.2s; }
+.type-dot:nth-child(3) { animation: typingPulse 1.2s ease-in-out infinite 0.4s; }
+
+/* Dropdown scale-in */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.scale-in { animation: scaleIn 0.15s ease-out both; transform-origin: top right; }
+
+/* Modal */
+@keyframes modalIn   { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes backdropIn{ from { opacity: 0; } to { opacity: 1; } }
+.modal-backdrop { animation: backdropIn 0.18s ease-out both; }
+.modal-card     { animation: modalIn 0.2s ease-out both; }
+
+/* Universal hover transition */
+.t-all { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
+
+/* ───────────────────────── Typography utility classes ───────────────────────── */
+.wordmark {
+  font-family: var(--f-display); font-weight: 700; font-size: 2.2rem;
+  letter-spacing: 4px; color: var(--whisper-primary); line-height: 1;
+  white-space: nowrap;
+}
+.sec-h {
+  font-family: var(--f-display); font-weight: 700; font-size: 1.125rem;
+  letter-spacing: 3px; color: var(--whisper-secondary); line-height: 1;
+}
+.lbl {
+  font-family: var(--f-ui); font-weight: 600; font-size: 0.75rem;
+  letter-spacing: 0.5px; color: var(--whisper-secondary);
+}
+.tag {
+  font-family: var(--f-ui); font-weight: 600; font-size: 0.5625rem;
+  letter-spacing: 1px; text-transform: uppercase; color: var(--whisper-muted);
+  background: rgba(200,200,220,0.06); border-radius: 4px; padding: 0.15em 0.45em;
+  display: inline-flex; align-items: center; line-height: 1;
+}
+.timestamp {
+  font-family: var(--f-ui); font-weight: 400; font-size: 0.625rem;
+  letter-spacing: 0.5px; color: var(--whisper-ghost);
+}
+.kbd {
+  font-family: var(--f-mono); font-size: 0.6875rem; color: var(--whisper-secondary);
+  background: rgba(200,200,220,0.05); border: 1px solid var(--void-border);
+  border-radius: 4px; padding: 1px 5px;
+}
+
+/* ───────────────────────── Markdown / prose inside chat bubbles ───────────────────────── */
+.prose-invert :where(p):not(:where([class~="not-prose"] *)) { color: var(--whisper-secondary); }
+.prose-invert :where(strong):not(:where([class~="not-prose"] *)) { color: var(--whisper-primary); }
+.prose-invert :where(a):not(:where([class~="not-prose"] *)) { color: var(--silk-accent); }
+.prose-invert :where(h1,h2,h3,h4):not(:where([class~="not-prose"] *)) { color: var(--whisper-primary); }

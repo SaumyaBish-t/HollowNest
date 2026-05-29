@@ -1,0 +1,82 @@
+# ── Secrets — NEVER commit ──
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/frontend/.env.local
+frontend/frontend/.env.production.local
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# ── Virtual environments ──
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+env/
+ENV/
+
+# ── Node / Next.js ──
+node_modules/
+.next/
+out/
+build/
+dist/
+.cache/
+.parcel-cache/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Editor / OS ──
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs ──
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── App-specific caches ──
+.nexus/
+agent_workspace/
+backend/agent_workspace/
+*.faiss
+backend/app/services/.cache/
+
+# ── Stray files ──
+-d
+-H
+
+# ── Playwright ──
+.playwright/
+playwright-report/
+test-results/
+playwright/.cache/
+
+# ── Misc ──
+.vercel
+.turbo
+
+# Dev scratch directory
+backend/scratch/
+*.err
+*.out

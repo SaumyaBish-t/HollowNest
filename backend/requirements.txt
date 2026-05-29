@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic-settings
+asyncpg
+faiss-cpu
+google-generativeai
+sqlalchemy
+httpx
+anthropic
+openai
+python-dotenv
+tiktoken
+PyGithub
+tavily-python
+playwright
+python-multipart
