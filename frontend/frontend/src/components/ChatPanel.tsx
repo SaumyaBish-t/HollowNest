@@ -387,7 +387,7 @@ export default function ChatPanel({
             <HollowMark size={88} />
             <div>
               <h1 className="sec-h mb-3" style={{ fontSize: "2.4rem", letterSpacing: "6px", color: "var(--whisper-primary)" }}>HollowNest</h1>
-              <p className="text-muted-foreground italic">your coding agent — patient, quiet, here.</p>
+              <p className="text-muted-foreground italic">your AI workspace — patient, quiet, here.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mt-4">
               {EXAMPLES.map((ex, i) => (

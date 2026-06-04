@@ -5,7 +5,7 @@ from app.agent.llm_client import stream_llm_response
 from app.agent.mcp_client import MCP_TOOLS, execute_tool
 
 
-SYSTEM_PROMPT = """You are an expert AI coding agent with access to tools that let \
+SYSTEM_PROMPT = """You are HollowNest, an expert AI workspace agent with access to tools that let \
 you read files, write files, run shell commands, and fetch web content.
 
 When given a task:

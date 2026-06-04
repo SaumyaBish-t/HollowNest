@@ -3,8 +3,8 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
-  title: "HollowNest — AI Coding Agent",
-  description: "Your coding agent — patient, quiet, here. Powered by multiple AI engines.",
+  title: "HollowNest — AI Workspace",
+  description: "Your AI workspace — patient, quiet, here. Powered by multiple AI engines.",
 };
 
 export default function RootLayout({
