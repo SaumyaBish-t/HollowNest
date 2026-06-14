@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from app.config import settings
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from app.config import get_user_keys
 from openai import AsyncOpenAI
 import tempfile
 import os
@@ -8,15 +8,30 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 
 
 @router.post("/transcribe")
-async def transcribe_audio(audio: UploadFile = File(...)):
-    if not settings.groq_api_key:
+async def transcribe_audio(request: Request, audio: UploadFile = File(...)):
+    # BYOK only — voice transcription uses the user's Groq key from the
+    # X-API-Keys header. The server never falls back to a shared key.
+    user_keys = get_user_keys(request)
+    groq_key = user_keys.get("groq", "")
+
+    if not groq_key:
         raise HTTPException(
             status_code=400,
-            detail="Voice transcription requires GROQ_API_KEY. Get a free key at console.groq.com",
+            detail=(
+                "Voice transcription requires a Groq API key. "
+                "Open the model selector, click the key icon on the 'Groq' "
+                "row, and paste your key. Free keys: console.groq.com/keys"
+            ),
         )
 
+    # Multi-line key pools are supported in the model selector — pick the first.
+    primary_key = next(
+        (k.strip() for k in groq_key.replace(",", "\n").split("\n") if k.strip()),
+        "",
+    )
+
     client = AsyncOpenAI(
-        api_key=settings.groq_api_key,
+        api_key=primary_key,
         base_url="https://api.groq.com/openai/v1",
     )
 

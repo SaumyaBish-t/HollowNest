@@ -7,6 +7,14 @@ import json
 import asyncio
 
 
+# google.generativeai stores the API key in process-global state. Two
+# concurrent /agent/run requests using different Gemini keys could race
+# and leak each other's keys. Serialize configure + model construction
+# behind this async lock so only one Gemini request configures the SDK
+# at a time.
+_gemini_configure_lock = asyncio.Lock()
+
+
 # ── Schema for known integer/number fields per tool (used for Gemini arg coercion) ──
 # Gemini's protobuf Struct returns all values as strings or floats.
 # This map tells us which fields need to be cast to int or bool.
@@ -93,8 +101,7 @@ async def _stream_gemini_native(
     
     while current_key_idx < len(api_key_pool):
         api_key = api_key_pool[current_key_idx].strip()
-        genai.configure(api_key=api_key, transport='rest')
-        
+
         # Prepare messages
         system_instruction = None
         gemini_history = []
@@ -202,18 +209,22 @@ async def _stream_gemini_native(
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
             ]
 
-            model = genai.GenerativeModel(
-                model_name=full_model_name,
-                system_instruction=system_instruction,
-                safety_settings=safety_settings
-            )
-            
-            # Generate response from full contents list
-            gen_task = model.generate_content_async(
-                contents=contents,
-                tools=native_tools if native_tools else None,
-                stream=True
-            )
+            # Hold the global Gemini key + model construction inside an async
+            # lock so a concurrent /agent/run with a different key cannot swap
+            # genai's module-level state mid-call.
+            async with _gemini_configure_lock:
+                genai.configure(api_key=api_key, transport='rest')
+                model = genai.GenerativeModel(
+                    model_name=full_model_name,
+                    system_instruction=system_instruction,
+                    safety_settings=safety_settings
+                )
+
+                gen_task = model.generate_content_async(
+                    contents=contents,
+                    tools=native_tools if native_tools else None,
+                    stream=True
+                )
             
             # SDK inconsistency: some versions return a coroutine, some return the iterator directly.
             if asyncio.iscoroutine(gen_task):

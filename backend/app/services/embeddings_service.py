@@ -1,11 +1,12 @@
+import os
 import threading
 from typing import List
 
 import numpy as np
 
 # Local, keyless embeddings via fastembed (ONNX runtime, no torch).
-# First use downloads ~50MB of model weights into the user's HF cache,
-# then everything runs offline on CPU.
+# First use downloads ~50MB of model weights into FASTEMBED_CACHE_PATH
+# (or the user's HF cache), then everything runs offline on CPU.
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 EMBED_DIM = 384
 
@@ -19,7 +20,11 @@ def _get_model():
         with _model_lock:
             if _model is None:
                 from fastembed import TextEmbedding
-                _model = TextEmbedding(model_name=EMBED_MODEL)
+                cache_dir = os.environ.get("FASTEMBED_CACHE_PATH")
+                kwargs = {"model_name": EMBED_MODEL}
+                if cache_dir:
+                    kwargs["cache_dir"] = cache_dir
+                _model = TextEmbedding(**kwargs)
     return _model
 
 

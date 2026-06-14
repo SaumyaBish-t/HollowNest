@@ -649,11 +649,26 @@ async def execute_tool(tool_name: str, tool_args: dict, user_keys: dict = None, 
         elif tool_name == "run_command":
             command = tool_args["command"]
             timeout = tool_args.get("timeout", 30)
-            # Blocklist dangerous commands
-            blocked = ["rm -rf", "sudo", "curl | sh", "wget | sh", ":(){ :|:& };:"]
-            for b in blocked:
-                if b in command:
-                    return f"Error: Command blocked for safety: '{b}'"
+            # Hardened blocklist for run_command. shell=True is required so
+            # the agent can run real dev workflows (npm test, pip install,
+            # pytest -k foo, git status, etc.), so we lean on pattern
+            # rejection rather than full sandboxing.
+            lowered = command.lower()
+            blocked_patterns = [
+                "rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf $home",
+                "sudo ", "doas ",
+                "curl | sh", "curl | bash", "wget | sh", "wget | bash",
+                "curl -s | sh", "curl -fssl | sh",
+                ":(){ :|:& };:",          # fork bomb
+                "mkfs", "dd if=", " of=/dev/",
+                "chmod -r 777 /", "chown -r ",
+                "shutdown", "reboot", "halt", "poweroff",
+                "/etc/passwd", "/etc/shadow",
+                "$(curl", "`curl", "$(wget", "`wget",
+            ]
+            for pattern in blocked_patterns:
+                if pattern in lowered:
+                    return f"Error: Command blocked for safety: matched '{pattern}'"
             result = subprocess.run(
                 command,
                 shell=True,
