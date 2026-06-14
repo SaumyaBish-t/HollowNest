@@ -3,6 +3,7 @@ uvicorn
 pydantic-settings
 asyncpg
 faiss-cpu
+fastembed
 google-generativeai
 sqlalchemy
 httpx

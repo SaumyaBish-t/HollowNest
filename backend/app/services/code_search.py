@@ -14,7 +14,7 @@ class CodeSearchService:
         self.metadata_file = self.nexus_dir / "metadata.json"
         
         self.embeddings_service = EmbeddingsService(api_keys=api_keys)
-        self.dimension = 768  # text-embedding-004 default
+        self.dimension = 384  # BAAI/bge-small-en-v1.5
         
         self.index = None
         self.metadata = []  # List of {path, line_start, line_end, content}

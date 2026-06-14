@@ -96,21 +96,17 @@ TOOL_METADATA = {
     },
     "semantic_search": {
         "name": "Semantic Search",
-        "description": "Search the project code by meaning and context using Gemini embeddings.",
-        "category": "external",
+        "description": "Search the project code by meaning and context using a local embedding model. No API key required.",
+        "category": "builtin",
         "icon": "zap",
-        "credentials": [
-            {"key": "google", "label": "Gemini API Key", "placeholder": "AIza... — used to compute embeddings", "link": "https://aistudio.google.com/apikey"}
-        ],
+        "credentials": [],
     },
     "index_workspace": {
         "name": "Index Project",
-        "description": "Scan and index all project files for semantic search using Gemini embeddings.",
-        "category": "external",
+        "description": "Scan and index all project files for semantic search using a local embedding model. No API key required.",
+        "category": "builtin",
         "icon": "refresh-cw",
-        "credentials": [
-            {"key": "google", "label": "Gemini API Key", "placeholder": "AIza... — used to compute embeddings", "link": "https://aistudio.google.com/apikey"}
-        ],
+        "credentials": [],
     },
     "run_parallel_subtasks": {
         "name": "Parallel Subtasks",
@@ -146,15 +142,6 @@ TOOL_METADATA = {
         "category": "builtin",
         "icon": "layers",
         "credentials": [],
-    },
-    "image_describe": {
-        "name": "Image Describe",
-        "description": "Describe what is in an image using Gemini vision (path or URL).",
-        "category": "external",
-        "icon": "zap",
-        "credentials": [
-            {"key": "gemini", "label": "Gemini API Key", "placeholder": "AIza...", "link": "https://aistudio.google.com/apikey"}
-        ],
     },
     "notion_tool": {
         "name": "Notion",
@@ -572,21 +559,6 @@ MCP_TOOLS = [
                     "task_id": {"type": "string", "description": "Task id to mark complete for action='complete'."},
                 },
                 "required": ["action"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "image_describe",
-            "description": "Describe what is in an image using Gemini vision. Provide either a workspace file path or a public image URL.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Path to an image file in the workspace."},
-                    "url": {"type": "string", "description": "Public URL of an image."},
-                    "prompt": {"type": "string", "description": "What to ask about the image.", "default": "Describe this image in detail."},
-                },
             },
         },
     },
@@ -1174,21 +1146,12 @@ with sync_playwright() as p:
 
         elif tool_name == "semantic_search":
             from app.services.code_search import CodeSearchService
-            # Get Gemini keys from user_keys or config for the embedding service
-            api_keys = []
-            if user_keys and user_keys.get("google"):
-                api_keys = [k.strip() for k in user_keys["google"].split("\n") if k.strip()]
-            
-            search_service = CodeSearchService(str(workspace), api_keys=api_keys)
+            search_service = CodeSearchService(str(workspace))
             return search_service.search(tool_args["query"], tool_args.get("top_k", 5))
 
         elif tool_name == "index_workspace":
             from app.services.code_search import CodeSearchService
-            api_keys = []
-            if user_keys and user_keys.get("google"):
-                api_keys = [k.strip() for k in user_keys["google"].split("\n") if k.strip()]
-
-            search_service = CodeSearchService(str(workspace), api_keys=api_keys)
+            search_service = CodeSearchService(str(workspace))
             return search_service.index_workspace()
 
         elif tool_name == "edit_file":
@@ -1324,52 +1287,6 @@ with sync_playwright() as p:
                 plan_file.write_text(json.dumps(plan, indent=2))
                 return f"Marked task {task_id} done.\n{_fmt(plan)}" if hit else f"No task with id '{task_id}'."
             return f"Unknown plan action: {action}"
-
-        elif tool_name == "image_describe":
-            import google.generativeai as genai
-            gemini_key = (user_keys or {}).get("gemini", "") or (user_keys or {}).get("google", "")
-            if not gemini_key:
-                return (
-                    "image_describe needs a Gemini API key. "
-                    "Open the Tool Store, connect 'Image Describe', and paste your Gemini key."
-                )
-            url = tool_args.get("url")
-            path_arg = tool_args.get("path")
-            prompt = tool_args.get("prompt") or "Describe this image in detail."
-            if not url and not path_arg:
-                return "Provide either 'path' or 'url' for the image."
-            genai.configure(api_key=gemini_key, transport="rest")
-            image_path = None
-            tmp_path = None
-            try:
-                if url:
-                    import tempfile
-                    import mimetypes
-                    r = httpx.get(url, timeout=20.0)
-                    if r.status_code != 200:
-                        return f"Failed to fetch image ({r.status_code})."
-                    ctype = (r.headers.get("content-type") or "").split(";")[0].strip()
-                    ext = mimetypes.guess_extension(ctype) or ".png"
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
-                    tmp.write(r.content)
-                    tmp.close()
-                    image_path = tmp.name
-                    tmp_path = tmp.name
-                else:
-                    p = _safe_path(path_arg, workspace)
-                    if not p.exists():
-                        return f"Image not found: {path_arg}"
-                    image_path = str(p)
-                gem_file = await asyncio.to_thread(genai.upload_file, image_path)
-                model = genai.GenerativeModel("models/gemini-2.5-flash")
-                response = await asyncio.to_thread(model.generate_content, [gem_file, prompt])
-                return getattr(response, "text", None) or "(no description returned)"
-            finally:
-                if tmp_path:
-                    try:
-                        os.unlink(tmp_path)
-                    except Exception:
-                        pass
 
         elif tool_name == "notion_tool":
             # Calls Notion's REST API directly via httpx — no extra deps needed.
