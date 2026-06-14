@@ -6,6 +6,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic Claude",
   nvidia: "NVIDIA NIM",
+  ollama: "Ollama Cloud",
 }
 
 export const PROVIDER_KEY_LINKS: Record<string, string> = {
@@ -16,6 +17,7 @@ export const PROVIDER_KEY_LINKS: Record<string, string> = {
   openai: "https://platform.openai.com/api-keys",
   anthropic: "https://console.anthropic.com/keys",
   nvidia: "https://build.nvidia.com",
+  ollama: "https://ollama.com/settings/keys",
 }
 
 // ── API key storage ──────────────────────────────────────────────────────────

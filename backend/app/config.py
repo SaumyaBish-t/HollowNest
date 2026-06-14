@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     nvidia_api_key: str = ""
     cerebras_api_key: str = ""
+    ollama_api_key: str = ""
     database_url: str = ""
     workspace_dir: str = "/tmp/agent_workspace"
     tavily_api_key: str = ""
@@ -111,6 +112,20 @@ PROVIDERS = {
         "api_key_env": "dashscope_api_key",
         "free": False,
         "free_note": "Free tokens on signup, then paid",
+    },
+    "ollama": {
+        "label": "Ollama Cloud",
+        "models": [
+            "gpt-oss:120b-cloud",
+            "gpt-oss:20b-cloud",
+            "deepseek-v3.1:671b-cloud",
+            "qwen3-coder:480b-cloud",
+            "kimi-k2:1t-cloud",
+        ],
+        "base_url": "https://ollama.com/v1",
+        "api_key_env": "ollama_api_key",
+        "free": True,
+        "free_note": "Free hourly/daily Cloud quotas with Ollama account; OpenAI-compatible",
     },
 }
 
