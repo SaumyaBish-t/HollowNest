@@ -18,16 +18,14 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 def get_providers():
     """
     Returns all supported providers and their models.
-    All providers are always returned — the frontend shows which ones
-    the user has a key for based on their localStorage.
+    This is a BYOK deployment — users must paste their own API key for each
+    provider in the model selector. The server never falls back to a shared key.
     """
     return {
         key: {
             "label": cfg["label"],
             "models": cfg["models"],
-            # True when the server already has a key for this provider in .env,
-            # so the frontend can mark its models active without a user key.
-            "has_env_key": bool(getattr(settings, cfg["api_key_env"], "")),
+            "has_env_key": False,
         }
         for key, cfg in PROVIDERS.items()
     }
@@ -57,17 +55,16 @@ async def run_agent_endpoint(
     if not cfg:
         raise HTTPException(status_code=400, detail=f"Unknown provider '{provider}'.")
 
-    api_key = (
-        user_keys.get(provider)
-        or getattr(settings, cfg["api_key_env"], "")
-    )
+    # BYOK only — no server-side LLM key fallback.
+    api_key = user_keys.get(provider, "")
 
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail=(
                 f"No API key found for '{cfg['label']}'. "
-                f"Please add your {cfg['label']} API key in Settings."
+                f"Open the model selector, click the key icon on the "
+                f"'{cfg['label']}' row, and paste your API key."
             ),
         )
 

@@ -58,11 +58,11 @@ TOOL_METADATA = {
     },
     "web_search": {
         "name": "Web Search",
-        "description": "Search the web for current information, docs, and answers using Tavily.",
+        "description": "Search the web for current information, docs, and answers. Uses Tavily when a key is provided; falls back to DuckDuckGo for keyless search.",
         "category": "external",
         "icon": "search",
         "credentials": [
-            {"key": "tavily", "label": "Tavily API Key", "placeholder": "tvly-...", "link": "https://app.tavily.com/home"}
+            {"key": "tavily", "label": "Tavily API Key (optional)", "placeholder": "tvly-... — leave blank to use DuckDuckGo", "link": "https://app.tavily.com/home"}
         ],
     },
     "github_tool": {
@@ -96,17 +96,21 @@ TOOL_METADATA = {
     },
     "semantic_search": {
         "name": "Semantic Search",
-        "description": "Search the project code by meaning and context using vector embeddings.",
-        "category": "builtin",
+        "description": "Search the project code by meaning and context using Gemini embeddings.",
+        "category": "external",
         "icon": "zap",
-        "credentials": [],
+        "credentials": [
+            {"key": "google", "label": "Gemini API Key", "placeholder": "AIza... — used to compute embeddings", "link": "https://aistudio.google.com/apikey"}
+        ],
     },
     "index_workspace": {
         "name": "Index Project",
-        "description": "Scan and index all project files for semantic search.",
-        "category": "builtin",
+        "description": "Scan and index all project files for semantic search using Gemini embeddings.",
+        "category": "external",
         "icon": "refresh-cw",
-        "credentials": [],
+        "credentials": [
+            {"key": "google", "label": "Gemini API Key", "placeholder": "AIza... — used to compute embeddings", "link": "https://aistudio.google.com/apikey"}
+        ],
     },
     "run_parallel_subtasks": {
         "name": "Parallel Subtasks",
@@ -146,9 +150,11 @@ TOOL_METADATA = {
     "image_describe": {
         "name": "Image Describe",
         "description": "Describe what is in an image using Gemini vision (path or URL).",
-        "category": "builtin",
+        "category": "external",
         "icon": "zap",
-        "credentials": [],
+        "credentials": [
+            {"key": "gemini", "label": "Gemini API Key", "placeholder": "AIza...", "link": "https://aistudio.google.com/apikey"}
+        ],
     },
     "notion_tool": {
         "name": "Notion",
@@ -777,44 +783,72 @@ with sync_playwright() as p:
                 return f"screenshot_url error: {str(e)}"
 
         elif tool_name == "web_search":
-            from tavily import TavilyClient
             from app.config import settings
 
+            query = tool_args["query"]
+            max_results = int(tool_args.get("max_results", 5) or 5)
             tavily_key = (user_keys or {}).get("tavily") or settings.tavily_api_key
 
-            if not tavily_key:
-                return (
-                    "web_search is not configured. "
-                    "Please add your Tavily API Key in the Settings."
-                )
+            # Preferred path: Tavily when a key is present.
+            if tavily_key:
+                try:
+                    from tavily import TavilyClient
+                    client = TavilyClient(api_key=tavily_key)
+                    response = client.search(
+                        query=query,
+                        max_results=max_results,
+                        include_raw_content=False,
+                    )
+                    results = response.get("results", [])
+                    if results:
+                        lines = [f"Search results for: {query}\n"]
+                        for i, r in enumerate(results, 1):
+                            lines.append(f"{i}. {r.get('title', 'No title')}")
+                            lines.append(f"   URL: {r.get('url', '')}")
+                            snippet = (r.get("content", "") or "")[:300]
+                            lines.append(f"   {snippet}\n")
+                        return "\n".join(lines)
+                    # Fall through to DDG if Tavily returned nothing
+                except Exception as e:
+                    print(f"[web_search] Tavily failed, falling back to DuckDuckGo: {e}")
 
+            # Fallback: DuckDuckGo — no key needed.
             try:
-                client = TavilyClient(api_key=tavily_key)
-                max_results = tool_args.get("max_results", 5)
-                response = client.search(
-                    query=tool_args["query"],
-                    max_results=max_results,
-                    include_raw_content=False,
-                )
-                results = response.get("results", [])
+                try:
+                    from ddgs import DDGS
+                except ImportError:
+                    from duckduckgo_search import DDGS  # legacy package name
+
+                def _ddg_search():
+                    with DDGS() as ddgs:
+                        return list(ddgs.text(query, max_results=max_results))
+
+                results = await asyncio.to_thread(_ddg_search)
                 if not results:
                     return "No results found for that query."
 
-                lines = [f"Search results for: {tool_args['query']}\n"]
+                lines = [f"Search results for: {query} (via DuckDuckGo)\n"]
                 for i, r in enumerate(results, 1):
-                    lines.append(f"{i}. {r.get('title', 'No title')}")
-                    lines.append(f"   URL: {r.get('url', '')}")
-                    snippet = r.get("content", "")[:300]
+                    title = r.get("title") or r.get("heading") or "No title"
+                    url = r.get("href") or r.get("url") or ""
+                    snippet = (r.get("body") or r.get("snippet") or "")[:300]
+                    lines.append(f"{i}. {title}")
+                    lines.append(f"   URL: {url}")
                     lines.append(f"   {snippet}\n")
                 return "\n".join(lines)
+            except ImportError:
+                return (
+                    "web_search needs either a Tavily key or the 'ddgs' package "
+                    "installed for DuckDuckGo fallback."
+                )
             except Exception as e:
-                return f"web_search error: {str(e)}"
+                return f"web_search error (DuckDuckGo): {str(e)}"
 
         elif tool_name == "github_tool":
             from github import Github, GithubException
             from app.config import settings
 
-            github_token = (user_keys or {}).get("github") or settings.github_token
+            github_token = (user_keys or {}).get("github", "")
 
             if not github_token:
                 return (
@@ -1293,9 +1327,12 @@ with sync_playwright() as p:
 
         elif tool_name == "image_describe":
             import google.generativeai as genai
-            gemini_key = (user_keys or {}).get("gemini") or settings.gemini_api_key
+            gemini_key = (user_keys or {}).get("gemini", "") or (user_keys or {}).get("google", "")
             if not gemini_key:
-                return "image_describe needs a Gemini API key."
+                return (
+                    "image_describe needs a Gemini API key. "
+                    "Open the Tool Store, connect 'Image Describe', and paste your Gemini key."
+                )
             url = tool_args.get("url")
             path_arg = tool_args.get("path")
             prompt = tool_args.get("prompt") or "Describe this image in detail."
@@ -1336,7 +1373,7 @@ with sync_playwright() as p:
 
         elif tool_name == "notion_tool":
             # Calls Notion's REST API directly via httpx — no extra deps needed.
-            token = (user_keys or {}).get("notion") or settings.notion_api_key
+            token = (user_keys or {}).get("notion", "")
             if not token:
                 return "Notion not configured. Add NOTION_API_KEY in .env or paste a token in the Tool Store."
             headers = {
@@ -1414,7 +1451,7 @@ with sync_playwright() as p:
             return f"Unknown notion action: {action}"
 
         elif tool_name == "slack_tool":
-            webhook = (user_keys or {}).get("slack_webhook") or settings.slack_webhook_url
+            webhook = (user_keys or {}).get("slack_webhook", "")
             if not webhook:
                 return "Slack not configured. Add SLACK_WEBHOOK_URL in .env or paste a webhook in the Tool Store."
             message = tool_args.get("message", "")

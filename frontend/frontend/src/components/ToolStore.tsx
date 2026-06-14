@@ -239,7 +239,7 @@ export default function ToolStore({ isOpen, onOpenChange, onToolsChanged }: Tool
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto bg-background border-border text-foreground">
+      <DialogContent className="w-[95vw] sm:max-w-[900px] lg:max-w-[1000px] max-h-[85vh] overflow-y-auto overflow-x-hidden bg-background border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <PlugZap size={24} className="text-accent" />
