@@ -67,6 +67,13 @@ backend/uploads/
 backend/test.db
 *.db-journal
 
+# ── Runtime / scratch artifacts ──
+backend/error_log.txt
+backend/server_log_run.txt
+skills-lock.json
+verify_final.py
+frontend/frontend/test_fetch.js
+
 # ── Stray files ──
 -d
 -H
