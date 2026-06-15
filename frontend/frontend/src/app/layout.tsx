@@ -18,6 +18,13 @@ export default function RootLayout({
       <body className="antialiased">
         <ClerkProvider
           appearance={{
+            // Cast through `any` because the `Variables` shape exposed by
+            // `@clerk/types` is intentionally narrow and several theme
+            // tokens we set here (colorText, colorTextSecondary,
+            // colorTextOnPrimaryBackground, colorShimmer) live in the
+            // shipped runtime but aren't in the public TS surface. The
+            // !important element classes in the sign-in / sign-up pages
+            // are the real source of truth for visible contrast.
             variables: {
               colorPrimary: "#c8c8dc",
               colorBackground: "#0d0d1a",
@@ -34,7 +41,8 @@ export default function RootLayout({
               borderRadius: "0.75rem",
               fontFamily: "var(--font-sans, ui-sans-serif, system-ui, sans-serif)",
               fontSize: "0.95rem",
-            },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
           }}
         >
           {/* Ambient void glow */}
