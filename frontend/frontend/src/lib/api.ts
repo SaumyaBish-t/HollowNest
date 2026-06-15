@@ -2,6 +2,36 @@ import { getKeyHeader } from "./keys";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// ── Clerk token plumbing ─────────────────────────────────────────────────────
+// The hosted frontend (Vercel) and the API (Railway) are cross-origin, so the
+// Clerk session cookie is not sent automatically. The app sets a token getter
+// once on mount via setAuthTokenGetter and every fetch attaches the JWT as a
+// Bearer token. The backend verifies it with Clerk's JWKS.
+type TokenGetter = () => Promise<string | null>;
+let _tokenGetter: TokenGetter | null = null;
+
+export function setAuthTokenGetter(fn: TokenGetter | null): void {
+  _tokenGetter = fn;
+}
+
+async function authHeader(): Promise<Record<string, string>> {
+  if (!_tokenGetter) return {};
+  try {
+    const token = await _tokenGetter();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
+async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const auth = await authHeader();
+  return fetch(input, {
+    ...init,
+    headers: { ...(init.headers || {}), ...auth },
+  });
+}
+
 export interface Session {
   id: string;
   title: string;
@@ -50,19 +80,19 @@ export interface ToolMetadata {
 // ── API calls ────────────────────────────────────────────────────────────────
 
 export async function getProviders(): Promise<Record<string, { label: string; models: string[]; has_env_key?: boolean }>> {
-  const res = await fetch(`${API_BASE}/agent/providers`, { cache: "no-store" });
+  const res = await authedFetch(`${API_BASE}/agent/providers`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch providers");
   return res.json();
 }
 
 export async function getToolsMetadata(): Promise<Record<string, ToolMetadata>> {
-  const res = await fetch(`${API_BASE}/agent/tools`);
+  const res = await authedFetch(`${API_BASE}/agent/tools`);
   if (!res.ok) throw new Error("Failed to fetch tools");
   return res.json();
 }
 
 export async function createSession(provider: string, model?: string): Promise<Session> {
-  const res = await fetch(`${API_BASE}/sessions`, {
+  const res = await authedFetch(`${API_BASE}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ provider, model }),
@@ -72,24 +102,24 @@ export async function createSession(provider: string, model?: string): Promise<S
 }
 
 export async function getSessions(): Promise<Session[]> {
-  const res = await fetch(`${API_BASE}/sessions`);
+  const res = await authedFetch(`${API_BASE}/sessions`);
   if (!res.ok) throw new Error("Failed to fetch sessions");
   return res.json();
 }
 
 export async function getSession(id: string): Promise<Session> {
-  const res = await fetch(`${API_BASE}/sessions/${id}`);
+  const res = await authedFetch(`${API_BASE}/sessions/${id}`);
   if (!res.ok) throw new Error("Failed to fetch session");
   return res.json();
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/sessions/${id}`, { method: "DELETE" });
+  const res = await authedFetch(`${API_BASE}/sessions/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete session");
 }
 
 export async function updateSessionTitle(id: string, title: string): Promise<Session> {
-  const res = await fetch(`${API_BASE}/sessions/${id}`, {
+  const res = await authedFetch(`${API_BASE}/sessions/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
@@ -102,7 +132,7 @@ export async function uploadFiles(files: File[]): Promise<{ files: any[] }> {
   const formData = new FormData();
   files.forEach(f => formData.append("files", f));
   
-  const res = await fetch(`${API_BASE}/uploads`, {
+  const res = await authedFetch(`${API_BASE}/uploads`, {
     method: "POST",
     body: formData,
   });
@@ -145,7 +175,7 @@ export async function* streamAgentRun(params: {
   workspace_path?: string;
   attachments?: any[];
 }): AsyncGenerator<AgentEvent, void, unknown> {
-  const res = await fetch(`${API_BASE}/agent/run`, {
+  const res = await authedFetch(`${API_BASE}/agent/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

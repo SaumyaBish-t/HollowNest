@@ -9,12 +9,23 @@ Why this split: FastAPI streams SSE and runs Playwright — both unhappy on serv
 ## 0. Prerequisites
 
 - GitHub account with this repo pushed
-- Accounts: [Neon](https://neon.tech), [Railway](https://railway.app), [Vercel](https://vercel.com)
+- Accounts: [Neon](https://neon.tech), [Railway](https://railway.app), [Vercel](https://vercel.com), [Clerk](https://clerk.com)
 - At least one LLM provider key (Cerebras / Groq / Gemini = free tiers)
 
 ---
 
-## 1. Database — Neon Postgres
+## 1. Clerk — Authentication
+
+1. [dashboard.clerk.com](https://dashboard.clerk.com) → **Create Application**. Pick the sign-in methods you want (Email, Google, GitHub, etc.).
+2. **API Keys** tab → copy three values:
+   - **Publishable key** → `pk_test_...` or `pk_live_...`
+   - **Secret key** → `sk_test_...` or `sk_live_...`
+   - **Frontend API URL** (under *Show JWT verification* → Issuer) → `https://your-app.clerk.accounts.dev`
+3. Save them. They go into Vercel + Railway in the next steps.
+
+---
+
+## 2. Database — Neon Postgres
 
 1. neon.tech → **New Project**
 2. Pick region nearest your Railway region
@@ -42,12 +53,15 @@ Settings → **Variables** → paste from `backend/.env.example`:
 
 | Key | Value |
 |---|---|
-| `DATABASE_URL` | the Neon URL from step 1 |
+| `DATABASE_URL` | the Neon URL from step 2 |
 | `WORKSPACE_DIR` | `/tmp/agent_workspace` |
 | `CORS_ORIGINS` | (leave blank for now — fill after Vercel) |
-| `GROQ_API_KEY` etc. | your provider keys |
-| `TAVILY_API_KEY`, `GITHUB_TOKEN`, `BREVO_API_KEY`, `NOTION_API_KEY`, `SLACK_WEBHOOK_URL` | optional |
+| `CLERK_JWT_ISSUER` | Clerk Frontend API URL from step 1 |
+| `TAVILY_API_KEY` (optional) | enables Tavily for `web_search`. Without it the tool falls back to DuckDuckGo (no key) |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` (optional) | enable the email tool |
 | `DEFAULT_PROVIDER` | `qwen` (or whichever you prefer) |
+
+> LLM provider keys (Groq, Anthropic, OpenAI, etc.) are **BYOK**. Users paste them in the UI; you do not set them server-side. Same for GitHub, Notion, Slack, Database Query — those are connected per-user from the Tool Store.
 
 Railway injects `PORT` automatically — do NOT set it.
 
@@ -78,6 +92,12 @@ Settings → **Environment Variables**:
 | Key | Value |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://<your-railway-url>` (no trailing slash) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key from step 1 (`pk_...`) |
+| `CLERK_SECRET_KEY` | Clerk secret key from step 1 (`sk_...`) |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/` |
 
 Apply to Production + Preview + Development.
 

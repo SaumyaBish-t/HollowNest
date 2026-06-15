@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 import aiofiles
 import os
@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 from typing import List
 from app.config import settings
+from app.auth import require_user
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 
@@ -17,7 +18,11 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("")
-async def upload_files(request: Request, files: List[UploadFile] = File(...)):
+async def upload_files(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    user_id: str = Depends(require_user),
+):
     """
     Receives file uploads, validates size/type, and saves locally.
     Returns a list of temporary URIs/Paths for the backend to use during agent runs.
@@ -53,7 +58,11 @@ async def upload_files(request: Request, files: List[UploadFile] = File(...)):
 
 
 @router.post("/current-screen")
-async def upload_current_screen(file: UploadFile = File(...), filename: str = "current-screen.png"):
+async def upload_current_screen(
+    file: UploadFile = File(...),
+    filename: str = "current-screen.png",
+    user_id: str = Depends(require_user),
+):
     """
     Saves a screenshot captured from the user's current browser tab to the
     configured workspace directory.

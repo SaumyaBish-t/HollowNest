@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from app.database import AsyncSessionLocal
@@ -6,6 +6,7 @@ from app.models import Session, Message, ToolCall
 from app.schemas import RunAgentRequest
 from app.agent.orchestrator import run_agent
 from app.agent.mcp_client import TOOL_METADATA, get_filtered_tools
+from app.auth import require_user
 from app.config import PROVIDERS, settings, get_user_keys
 import json
 import uuid
@@ -44,6 +45,7 @@ def get_tools():
 async def run_agent_endpoint(
     req: RunAgentRequest,
     request: Request,
+    user_id: str = Depends(require_user),
 ):
     # ── 1. Extract user-provided API keys from request header ──────────────
     user_keys = get_user_keys(request)
@@ -79,7 +81,10 @@ async def run_agent_endpoint(
         async with AsyncSessionLocal() as db:
             if req.session_id:
                 result = await db.execute(
-                    select(Session).where(Session.id == req.session_id)
+                    select(Session).where(
+                        Session.id == req.session_id,
+                        Session.user_id == user_id,
+                    )
                 )
                 session = result.scalar_one_or_none()
                 if session:
@@ -87,7 +92,7 @@ async def run_agent_endpoint(
                     model = req.model or session.model
 
             if not session:
-                session = Session(provider=provider, model=model)
+                session = Session(provider=provider, model=model, user_id=user_id)
                 db.add(session)
                 await db.commit()
                 await db.refresh(session)

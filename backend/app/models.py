@@ -11,8 +11,17 @@ def gen_uuid():
 
 class Session(Base):
     __tablename__ = "sessions"
+    # Sessions are listed for a single user at a time, sorted by recency,
+    # so an index on (user_id, updated_at) keeps the dashboard query cheap.
+    __table_args__ = (
+        Index("ix_sessions_user_updated", "user_id", "updated_at"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=gen_uuid)
+    # Clerk user id (the `sub` claim from the session JWT). Every read,
+    # update, and delete query filters on this so users only ever see their
+    # own sessions.
+    user_id: Mapped[str] = mapped_column(String(100), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(200), default="New session")
     provider: Mapped[str] = mapped_column(String(50), default="qwen")
     model: Mapped[str] = mapped_column(String(100), default="qwen3-coder-next")

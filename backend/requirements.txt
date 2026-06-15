@@ -16,3 +16,4 @@ tavily-python
 ddgs
 playwright
 python-multipart
+PyJWT[crypto]

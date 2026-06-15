@@ -18,15 +18,27 @@ INDEXES = [
     "ON messages (session_id, created_at)",
     "CREATE INDEX IF NOT EXISTS ix_tool_calls_message_id "
     "ON tool_calls (message_id)",
+    "CREATE INDEX IF NOT EXISTS ix_sessions_user_updated "
+    "ON sessions (user_id, updated_at)",
+    "CREATE INDEX IF NOT EXISTS ix_sessions_user_id "
+    "ON sessions (user_id)",
+]
+
+# Light-touch migrations for columns added after the initial schema. Each one
+# must be idempotent so re-running init_db.py is always safe.
+MIGRATIONS = [
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS user_id VARCHAR(100)",
 ]
 
 
 async def main():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        for stmt in MIGRATIONS:
+            await conn.execute(text(stmt))
         for stmt in INDEXES:
             await conn.execute(text(stmt))
-    print("All tables and indexes created.")
+    print("All tables, columns, and indexes created.")
     await engine.dispose()
 
 

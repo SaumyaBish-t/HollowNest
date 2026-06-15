@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     notion_api_key: str = ""
     slack_webhook_url: str = ""
     default_provider: str = "qwen"
+    # Clerk auth. CLERK_JWT_ISSUER is the Frontend API URL of the Clerk
+    # instance (e.g. https://your-app.clerk.accounts.dev). The backend
+    # fetches {issuer}/.well-known/jwks.json to verify the JWT on every
+    # protected request. CLERK_DISABLE_AUTH is a local-dev opt-out so the
+    # backend can run without a Clerk app configured.
+    clerk_jwt_issuer: str = ""
+    clerk_disable_auth: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

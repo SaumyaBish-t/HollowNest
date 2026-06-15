@@ -80,6 +80,8 @@ playwright/.cache/
 # ── Misc ──
 .vercel
 .turbo
+.agents/
+.claude/
 
 # Dev scratch directory
 backend/scratch/

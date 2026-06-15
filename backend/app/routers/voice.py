@@ -1,5 +1,6 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Depends
 from app.config import get_user_keys
+from app.auth import require_user
 from openai import AsyncOpenAI
 import tempfile
 import os
@@ -8,7 +9,11 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 
 
 @router.post("/transcribe")
-async def transcribe_audio(request: Request, audio: UploadFile = File(...)):
+async def transcribe_audio(
+    request: Request,
+    audio: UploadFile = File(...),
+    user_id: str = Depends(require_user),
+):
     # BYOK only — voice transcription uses the user's Groq key from the
     # X-API-Keys header. The server never falls back to a shared key.
     user_keys = get_user_keys(request)

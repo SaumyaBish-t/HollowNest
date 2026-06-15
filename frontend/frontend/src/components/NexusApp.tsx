@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Settings, PlugZap } from "lucide-react";
+import { useAuth, UserButton } from "@clerk/nextjs";
 import SessionSidebar from "./SessionSidebar";
 import ChatPanel from "./ChatPanel";
 import ToolCallPanel from "./ToolCallPanel";
 import ToolStore from "./ToolStore";
 import { ToolCallData } from "./ToolCallPanel";
-import { getSessions, getProviders, Session, deleteSession } from "@/lib/api";
+import { getSessions, getProviders, Session, deleteSession, setAuthTokenGetter } from "@/lib/api";
 import { getConnectedTools, getWorkspacePath, saveWorkspacePath } from "@/lib/keys";
 
 interface NexusAppProps {
@@ -19,7 +20,16 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function NexusApp({ initialSessionId = null }: NexusAppProps) {
   const router = useRouter();
-  
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+
+  // Install the Clerk token getter so every authedFetch in lib/api.ts
+  // attaches Authorization: Bearer <jwt> to its request.
+  useEffect(() => {
+    if (!isLoaded) return;
+    setAuthTokenGetter(isSignedIn ? () => getToken() : null);
+    return () => setAuthTokenGetter(null);
+  }, [isLoaded, isSignedIn, getToken]);
+
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId);
   const [selectedProvider, setSelectedProvider] = useState("cerebras");
   const [selectedModel, setSelectedModel] = useState("gpt-oss-120b");
@@ -211,12 +221,17 @@ export default function NexusApp({ initialSessionId = null }: NexusAppProps) {
 
 
       {showToolStore && (
-        <ToolStore 
-          isOpen={showToolStore} 
-          onOpenChange={setShowToolStore} 
-          onToolsChanged={refreshConnectedTools} 
+        <ToolStore
+          isOpen={showToolStore}
+          onOpenChange={setShowToolStore}
+          onToolsChanged={refreshConnectedTools}
         />
       )}
+
+      {/* Account menu — floating top-right */}
+      <div className="absolute top-3 right-4 z-50">
+        <UserButton afterSignOutUrl="/sign-in" />
+      </div>
     </div>
   );
 }
