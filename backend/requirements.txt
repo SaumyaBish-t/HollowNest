@@ -15,4 +15,6 @@ PyGithub
 tavily-python
 ddgs
 python-multipart
+aiofiles
+pypdf
 PyJWT[crypto]
