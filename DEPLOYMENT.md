@@ -1,8 +1,10 @@
 # HollowNest Deployment Guide
 
-Production stack: **Neon Postgres** (DB) + **Railway** (FastAPI backend, Docker) + **Vercel** (Next.js frontend).
+Production stack: **Neon Postgres** (DB) + **Render free tier** (FastAPI backend, Docker) + **Vercel** (Next.js frontend) + **Clerk** (auth).
 
-Why this split: FastAPI streams SSE and runs Playwright — both unhappy on serverless. Railway/Render/Fly run long-lived containers. Vercel runs the frontend ideally.
+Why this split: FastAPI streams SSE — unhappy on serverless. Render free runs long-lived containers, 512MB RAM. Playwright was stripped from this build so the image fits comfortably. Vercel runs the Next.js frontend.
+
+> Previously this guide targeted Railway. The Dockerfile + `render.yaml` work on both — pick whichever has free credit.
 
 ---
 
@@ -38,23 +40,31 @@ Why this split: FastAPI streams SSE and runs Playwright — both unhappy on serv
 
 ---
 
-## 3. Backend — Railway
+## 3. Backend — Render (free tier)
 
 ### 3.1 Create service
 
-1. railway.app → **New Project** → **Deploy from GitHub repo**
+1. [render.com](https://render.com) → **New + → Web Service** → connect this GitHub repo
 2. Pick `HollowNest`
-3. Settings → **Root Directory** = `backend`
-4. Builder auto-detects the `Dockerfile` (already wired)
+3. Settings:
+   - **Root Directory** = `backend`
+   - **Runtime** = Docker (auto-detected from Dockerfile)
+   - **Region** = closest to your Neon region
+   - **Instance Type** = `Free` (512MB RAM)
+4. Health Check Path = `/health`
+
+Alternative: `render.yaml` is already in the repo — Render auto-detects it for "Blueprint" deploys, which pre-fills everything except the secret env vars.
 
 ### 3.2 Environment variables
 
-Settings → **Variables** → paste from `backend/.env.example`:
+Settings → **Environment** → paste from `backend/.env.example`:
 
 | Key | Value |
 |---|---|
 | `DATABASE_URL` | the Neon URL from step 2 |
 | `WORKSPACE_DIR` | `/tmp/agent_workspace` |
+| `HF_HOME` | `/tmp/hf_cache` |
+| `FASTEMBED_CACHE_PATH` | `/tmp/hf_cache/fastembed` |
 | `CORS_ORIGINS` | (leave blank for now — fill after Vercel) |
 | `CLERK_JWT_ISSUER` | Clerk Frontend API URL from step 1 |
 | `TAVILY_API_KEY` (optional) | enables Tavily for `web_search`. Without it the tool falls back to DuckDuckGo (no key) |
@@ -63,15 +73,21 @@ Settings → **Variables** → paste from `backend/.env.example`:
 
 > LLM provider keys (Groq, Anthropic, OpenAI, etc.) are **BYOK**. Users paste them in the UI; you do not set them server-side. Same for GitHub, Notion, Slack, Database Query — those are connected per-user from the Tool Store.
 
-Railway injects `PORT` automatically — do NOT set it.
+Render injects `PORT` automatically — do NOT set it.
 
 ### 3.3 Deploy
 
-- Push to `main` → Railway builds & deploys
-- First build takes ~7 min (Playwright image + fastembed BGE model bake-in)
-- Settings → **Networking** → **Generate Domain** → copy URL (e.g. `https://hollownest-production.up.railway.app`)
+- Click **Create Web Service** → Render builds & deploys
+- First build takes ~4–6 min (slim Python image + fastembed BGE model bake-in, no Playwright)
+- Copy the URL (e.g. `https://hollownest-api.onrender.com`)
 - Verify: `curl https://<url>/health` → `{"status":"ok"}`
 - DB tables created automatically on boot (`python init_db.py` in the start command, idempotent `ALTER TABLE` migrations included)
+
+### 3.4 Free-tier caveats
+
+- Service **sleeps after 15 min idle**. First request after sleep takes 30–60s (cold start). Subsequent requests are fast.
+- 512MB RAM is enough for FastAPI + fastembed but leaves no headroom. If you hit OOM, upgrade to Starter ($7/mo) — same Dockerfile.
+- `screenshot_url` tool was removed from this build to fit. If you need it back, switch base image to `mcr.microsoft.com/playwright/python` and use a paid plan with at least 1GB RAM.
 
 ---
 
@@ -148,7 +164,7 @@ Clerk's frontend SDK refuses to load from origins it doesn't know.
 | CORS error in browser console | Add Vercel / custom domain to `CORS_ORIGINS`, redeploy backend |
 | `init_db.py` errors on boot | `DATABASE_URL` missing `+asyncpg` prefix or `sslmode=require` |
 | `column "user_id" does not exist` on sessions | `init_db.py` didn't run — Railway start cmd already runs it on boot; if you migrated DB by hand, run `python init_db.py` once |
-| Playwright `Executable doesn't exist` | You changed Dockerfile base image — keep `mcr.microsoft.com/playwright/python` |
+| Backend OOM on Render free | 512MB is tight. Upgrade to Starter ($7) or drop unused providers from `requirements.txt` |
 | `web_search` says no Tavily key | Expected — falls back to DuckDuckGo automatically via `ddgs` |
 | SSE stream cuts at 60s | You deployed backend to Vercel/Netlify (don't) — use Railway/Render/Fly |
 | Files written by agent vanish | `WORKSPACE_DIR=/tmp/...` is ephemeral; attach Railway Volume mounted at `/data` and set `WORKSPACE_DIR=/data/workspace` |
@@ -182,7 +198,6 @@ For zero-cost: swap Railway for **Render free tier** (sleeps after 15 min idle, 
 cd backend
 python -m venv venv && venv\Scripts\activate    # or source venv/bin/activate
 pip install -r requirements.txt
-playwright install chromium
 copy .env.example .env                           # cp on macOS/Linux
 # Fill DATABASE_URL + CLERK_JWT_ISSUER at minimum.
 # For dev without Clerk: set CLERK_DISABLE_AUTH=true

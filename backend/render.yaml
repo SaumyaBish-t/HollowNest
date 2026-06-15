@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: hollownest-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: WORKSPACE_DIR
+        value: /tmp/agent_workspace
+      - key: HF_HOME
+        value: /tmp/hf_cache
+      - key: FASTEMBED_CACHE_PATH
+        value: /tmp/hf_cache/fastembed
+      - key: CLERK_DISABLE_AUTH
+        value: "false"
+      # Fill these in the Render dashboard after creating the service:
+      - key: DATABASE_URL
+        sync: false
+      - key: CLERK_JWT_ISSUER
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        sync: false

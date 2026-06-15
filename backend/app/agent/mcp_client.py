@@ -49,13 +49,6 @@ TOOL_METADATA = {
         "icon": "globe",
         "credentials": [],
     },
-    "screenshot_url": {
-        "name": "Screenshot URL",
-        "description": "Take a screenshot of a web page or locally running app and save it to the workspace.",
-        "category": "builtin",
-        "icon": "image",
-        "credentials": [],
-    },
     "web_search": {
         "name": "Web Search",
         "description": "Search the web for current information, docs, and answers. Uses Tavily when a key is provided; falls back to DuckDuckGo for keyless search.",
@@ -261,38 +254,6 @@ MCP_TOOLS = [
                 "required": ["url"],
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "screenshot_url",
-            "description": "Take a screenshot of a web page or locally running app (e.g. http://localhost:3000) and save it to the workspace. Use this to visually verify that a frontend you built renders correctly. Returns the saved file path so the user can view the screenshot.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The URL to screenshot e.g. http://localhost:3000"
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "Output filename (default: screenshot.png)",
-                        "default": "screenshot.png"
-                    },
-                    "full_page": {
-                        "type": ["boolean", "string"],
-                        "description": "Whether to capture the full scrollable page height. Use false/true or 'false'/'true'. Default false.",
-                        "default": False
-                    },
-                    "wait_ms": {
-                        "type": ["integer", "string"],
-                        "description": "Milliseconds to wait after page load before screenshot. Use 1000 or '1000'. Useful for pages with animations. Default 1000.",
-                        "default": 1000
-                    }
-                },
-                "required": ["url"]
-            }
-        }
     },
     {
         "type": "function",
@@ -691,83 +652,6 @@ async def execute_tool(tool_name: str, tool_args: dict, user_keys: dict = None, 
                 resp = await client.get(url, follow_redirects=True)
                 # Return first 4000 chars to avoid context overflow
                 return resp.text[:4000]
-
-        elif tool_name == "screenshot_url":
-            url = tool_args["url"]
-            filename = tool_args.get("filename", "screenshot.png")
-            full_page = tool_args.get("full_page", False)
-            wait_ms = tool_args.get("wait_ms", 1000)
-
-            if isinstance(full_page, str):
-                full_page = full_page.strip().lower() in ("true", "1", "yes")
-            try:
-                wait_ms = int(wait_ms)
-            except (TypeError, ValueError):
-                wait_ms = 1000
-
-            if not filename.endswith(".png"):
-                filename = filename + ".png"
-
-            output_path = _safe_path(filename, workspace)
-
-            try:
-                capture_script = r"""
-import asyncio
-import json
-import sys
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
-
-if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-params = json.loads(sys.argv[1])
-with sync_playwright() as p:
-    browser = p.chromium.launch(
-        headless=True,
-        args=["--no-sandbox", "--disable-setuid-sandbox"],
-    )
-    try:
-        page = browser.new_page(viewport={"width": 1280, "height": 800})
-        try:
-            page.goto(params["url"], wait_until="networkidle", timeout=30000)
-        except PlaywrightTimeoutError:
-            page.goto(params["url"], wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(params["wait_ms"])
-        page.screenshot(
-            path=params["output_path"],
-            full_page=params["full_page"],
-        )
-    finally:
-        browser.close()
-"""
-                params = {
-                    "url": url,
-                    "output_path": str(output_path),
-                    "full_page": full_page,
-                    "wait_ms": wait_ms,
-                }
-                result = subprocess.run(
-                    [sys.executable, "-c", capture_script, json.dumps(params)],
-                    capture_output=True,
-                    text=True,
-                    timeout=45,
-                )
-                if result.returncode != 0:
-                    error = (result.stderr or result.stdout).strip()
-                    return f"screenshot_url error: {error or 'Playwright capture failed.'}"
-
-                file_size_kb = output_path.stat().st_size // 1024
-                return (
-                    f"Screenshot saved successfully.\n"
-                    f"File: {filename}\n"
-                    f"Path: {str(output_path)}\n"
-                    f"Size: {file_size_kb}KB\n"
-                    f"URL captured: {url}\n"
-                    f"Full page: {full_page}"
-                )
-
-            except Exception as e:
-                return f"screenshot_url error: {str(e)}"
 
         elif tool_name == "web_search":
             from app.config import settings

@@ -230,20 +230,6 @@ async def run_agent(
                 "content": result,
             })
 
-            if tc["tool_name"] == "screenshot_url":
-                if result.startswith("Screenshot saved successfully."):
-                    yield {
-                        "type": "text",
-                        "content": "\n\nThe screenshot has been saved successfully. You can find the exact path in the tool output.",
-                    }
-                else:
-                    yield {
-                        "type": "text",
-                        "content": f"\n\nScreenshot failed: {result}",
-                    }
-                yield {"type": "done"}
-                return
-
     yield {
         "type": "error",
         "message": "Reached maximum iterations. The task may be too complex — try breaking it into smaller steps.",

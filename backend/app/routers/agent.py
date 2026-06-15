@@ -175,19 +175,11 @@ async def run_agent_endpoint(
     filtered_tools = get_filtered_tools(enabled_tools)
     lower_message = req.message.lower()
     email_intent = "email" in lower_message or "mail" in lower_message
-    screenshot_intent = "screenshot" in lower_message or "screen shot" in lower_message
     needs_workspace_tools = any(
         word in lower_message
         for word in ("file", "code", "test", "build", "run", "debug", "workspace", "project folder")
     )
-    if screenshot_intent:
-        screenshot_tools = [
-            tool for tool in filtered_tools
-            if tool["function"]["name"] == "screenshot_url"
-        ]
-        if screenshot_tools:
-            filtered_tools = screenshot_tools
-    elif email_intent and not needs_workspace_tools:
+    if email_intent and not needs_workspace_tools:
         email_tools = [
             tool for tool in filtered_tools
             if tool["function"]["name"] == "send_email"
