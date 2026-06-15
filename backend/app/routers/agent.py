@@ -64,9 +64,9 @@ async def run_agent_endpoint(
         raise HTTPException(
             status_code=400,
             detail=(
-                f"No API key found for '{cfg['label']}'. "
+                f"API key for the provider \"{cfg['label']}\" is not set. "
                 f"Open the model selector, click the key icon on the "
-                f"'{cfg['label']}' row, and paste your API key."
+                f"\"{cfg['label']}\" row, and paste your API key."
             ),
         )
 

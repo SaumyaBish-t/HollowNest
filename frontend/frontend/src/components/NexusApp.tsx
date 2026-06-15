@@ -10,7 +10,13 @@ import ToolCallPanel from "./ToolCallPanel";
 import ToolStore from "./ToolStore";
 import { ToolCallData } from "./ToolCallPanel";
 import { getSessions, getProviders, Session, deleteSession, setAuthTokenGetter } from "@/lib/api";
-import { getConnectedTools, getWorkspacePath, saveWorkspacePath } from "@/lib/keys";
+import {
+  getConnectedTools,
+  getWorkspacePath,
+  saveWorkspacePath,
+  setKeyUserScope,
+  migrateLegacyKeysIntoScope,
+} from "@/lib/keys";
 
 interface NexusAppProps {
   initialSessionId?: string | null;
@@ -20,15 +26,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function NexusApp({ initialSessionId = null }: NexusAppProps) {
   const router = useRouter();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
-
-  // Install the Clerk token getter so every authedFetch in lib/api.ts
-  // attaches Authorization: Bearer <jwt> to its request.
-  useEffect(() => {
-    if (!isLoaded) return;
-    setAuthTokenGetter(isSignedIn ? () => getToken() : null);
-    return () => setAuthTokenGetter(null);
-  }, [isLoaded, isSignedIn, getToken]);
+  const { isLoaded, isSignedIn, userId, getToken } = useAuth();
+  const [scopeReady, setScopeReady] = useState(false);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId);
   const [selectedProvider, setSelectedProvider] = useState("cerebras");
@@ -62,16 +61,44 @@ export default function NexusApp({ initialSessionId = null }: NexusAppProps) {
     }
   }, []);
 
-  // Load initial data
+  // Install the Clerk token getter so every authedFetch in lib/api.ts
+  // attaches Authorization: Bearer <jwt> to its request.
   useEffect(() => {
+    if (!isLoaded) return;
+    setAuthTokenGetter(isSignedIn ? () => getToken() : null);
+    return () => setAuthTokenGetter(null);
+  }, [isLoaded, isSignedIn, getToken]);
+
+  // Scope all localStorage reads/writes (API keys, tool credentials,
+  // connected-tool list, workspace path) to the current Clerk user so two
+  // accounts on the same browser cannot see each other's keys. First time
+  // a user signs in on this browser any legacy un-scoped entries written
+  // by older builds are migrated into the user's scope.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn && userId) {
+      setKeyUserScope(userId);
+      migrateLegacyKeysIntoScope();
+    } else {
+      setKeyUserScope(null);
+    }
+    setConnectedTools(getConnectedTools());
+    setWorkspacePath(getWorkspacePath());
+    setScopeReady(true);
+    return () => setKeyUserScope(null);
+  }, [isLoaded, isSignedIn, userId]);
+
+  // Load initial data — wait for the scope to be installed first so the
+  // X-API-Keys header on getProviders/getSessions can pull from the right
+  // localStorage bucket.
+  useEffect(() => {
+    if (!scopeReady) return;
     getProviders()
       .then(setProvidersData)
       .catch(e => console.error("Failed to load providers", e));
-      
+
     refreshSessions();
-    setConnectedTools(getConnectedTools());
-    setWorkspacePath(getWorkspacePath());
-  }, [refreshSessions]);
+  }, [scopeReady, refreshSessions]);
 
   // Update URL and state on session change
   useEffect(() => {

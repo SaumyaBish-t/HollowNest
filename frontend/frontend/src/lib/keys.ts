@@ -20,20 +20,54 @@ export const PROVIDER_KEY_LINKS: Record<string, string> = {
   ollama: "https://ollama.com/settings/keys",
 }
 
-// ── API key storage ──────────────────────────────────────────────────────────
+// ── User-scoped localStorage ─────────────────────────────────────────────────
+// All keys, tool credentials, connected-tool lists, and workspace paths are
+// stored under a per-Clerk-user prefix so two users sharing the same browser
+// cannot see each other's keys.
+//
+// Scope is installed by NexusApp on mount once Clerk loads the current user.
+// When no user is signed in (and before the scope is installed), every getter
+// returns empty and every setter is a no-op — protected routes are already
+// gated by Clerk middleware, so this is purely defense in depth.
 
-export function saveKey(provider: string, key: string): void {
+let _userScope: string | null = null
+
+export function setKeyUserScope(userId: string | null): void {
+  _userScope = userId || null
+}
+
+function scopedKey(name: string): string | null {
+  if (!_userScope) return null
+  return `u:${_userScope}:${name}`
+}
+
+function readScoped(name: string): string | null {
+  if (typeof window === "undefined") return null
+  const k = scopedKey(name)
+  if (!k) return null
+  return localStorage.getItem(k)
+}
+
+function writeScoped(name: string, value: string | null): void {
   if (typeof window === "undefined") return
-  if (key.trim()) {
-    localStorage.setItem(`apikey_${provider}`, key.trim())
+  const k = scopedKey(name)
+  if (!k) return
+  if (value === null) {
+    localStorage.removeItem(k)
   } else {
-    localStorage.removeItem(`apikey_${provider}`)
+    localStorage.setItem(k, value)
   }
 }
 
+// ── API key storage ──────────────────────────────────────────────────────────
+
+export function saveKey(provider: string, key: string): void {
+  const trimmed = key.trim()
+  writeScoped(`apikey_${provider}`, trimmed ? trimmed : null)
+}
+
 export function getKey(provider: string): string {
-  if (typeof window === "undefined") return ""
-  return localStorage.getItem(`apikey_${provider}`) || ""
+  return readScoped(`apikey_${provider}`) || ""
 }
 
 export function hasKey(provider: string): boolean {
@@ -41,25 +75,25 @@ export function hasKey(provider: string): boolean {
 }
 
 export function getAllKeys(): Record<string, string> {
-  if (typeof window === "undefined") return {}
+  if (typeof window === "undefined" || !_userScope) return {}
   const keys: Record<string, string> = {}
-  
-  // Gather all provider keys
+
+  // Provider keys
   Object.keys(PROVIDER_LABELS).forEach((p) => {
     const k = getKey(p)
     if (k) keys[p] = k
   })
-  
-  // Gather all tool credential keys
+
+  // Tool credential keys
   let toolCredKeys: string[] = []
   try {
-    toolCredKeys = JSON.parse(localStorage.getItem("tool_credential_keys") || "[]") as string[]
+    toolCredKeys = JSON.parse(readScoped("tool_credential_keys") || "[]") as string[]
   } catch (e) {
     console.warn("Failed to parse tool_credential_keys", e)
   }
 
   toolCredKeys.forEach((credKey) => {
-    const val = localStorage.getItem(`apikey_${credKey}`)
+    const val = readScoped(`apikey_${credKey}`)
     if (val) keys[credKey] = val
   })
 
@@ -71,31 +105,29 @@ export function getKeyHeader(): string {
 }
 
 // ── Tool connection tracking ─────────────────────────────────────────────────
-// A tool is "connected" when the user has saved all required credentials for it.
-// Connected tool IDs are stored in localStorage as a JSON array.
 
 export function getConnectedTools(): string[] {
-  if (typeof window === "undefined") return []
+  if (typeof window === "undefined" || !_userScope) return []
   try {
-    return JSON.parse(localStorage.getItem("connected_tools") || "[]")
+    return JSON.parse(readScoped("connected_tools") || "[]")
   } catch {
     return []
   }
 }
 
 export function connectTool(toolId: string): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined" || !_userScope) return
   const tools = getConnectedTools()
   if (!tools.includes(toolId)) {
     tools.push(toolId)
-    localStorage.setItem("connected_tools", JSON.stringify(tools))
+    writeScoped("connected_tools", JSON.stringify(tools))
   }
 }
 
 export function disconnectTool(toolId: string): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined" || !_userScope) return
   const tools = getConnectedTools().filter((t) => t !== toolId)
-  localStorage.setItem("connected_tools", JSON.stringify(tools))
+  writeScoped("connected_tools", JSON.stringify(tools))
 }
 
 export function isToolConnected(toolId: string): boolean {
@@ -106,20 +138,19 @@ export function isToolConnected(toolId: string): boolean {
  * Save a tool credential key and track it for the X-API-Keys header.
  */
 export function saveToolCredential(credentialKey: string, value: string): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined" || !_userScope) return
   saveKey(credentialKey, value)
-  
-  // Track which credential keys exist so getAllKeys can find them
+
   let tracked: string[] = []
   try {
-    tracked = JSON.parse(localStorage.getItem("tool_credential_keys") || "[]") as string[]
+    tracked = JSON.parse(readScoped("tool_credential_keys") || "[]") as string[]
   } catch (e) {
     console.warn("Failed to parse tool_credential_keys for tracking", e)
   }
 
   if (!tracked.includes(credentialKey)) {
     tracked.push(credentialKey)
-    localStorage.setItem("tool_credential_keys", JSON.stringify(tracked))
+    writeScoped("tool_credential_keys", JSON.stringify(tracked))
   }
 }
 
@@ -130,15 +161,50 @@ export function getToolCredential(credentialKey: string): string {
 // ── Workspace path persistence ───────────────────────────────────────────────
 
 export function saveWorkspacePath(path: string): void {
-  if (typeof window === "undefined") return
-  if (path.trim()) {
-    localStorage.setItem("workspace_path", path.trim())
-  } else {
-    localStorage.removeItem("workspace_path")
-  }
+  const trimmed = path.trim()
+  writeScoped("workspace_path", trimmed ? trimmed : null)
 }
 
 export function getWorkspacePath(): string {
-  if (typeof window === "undefined") return ""
-  return localStorage.getItem("workspace_path") || ""
+  return readScoped("workspace_path") || ""
+}
+
+// ── One-time migration of legacy un-scoped entries ───────────────────────────
+// Old builds wrote `apikey_<provider>`, `connected_tools`, etc. directly to
+// localStorage. The first time a Clerk user signs in on this browser we copy
+// those un-scoped values into the user's scope, then delete the originals.
+//
+// Returns the number of entries migrated.
+
+const LEGACY_PROVIDER_PREFIX = "apikey_"
+const LEGACY_FLAT_KEYS = [
+  "connected_tools",
+  "tool_credential_keys",
+  "workspace_path",
+]
+
+export function migrateLegacyKeysIntoScope(): number {
+  if (typeof window === "undefined" || !_userScope) return 0
+  let moved = 0
+
+  // Move any apikey_* values that aren't already scoped (no "u:" prefix).
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const rawKey = localStorage.key(i)
+    if (!rawKey) continue
+    if (rawKey.startsWith("u:")) continue
+    if (!rawKey.startsWith(LEGACY_PROVIDER_PREFIX) && !LEGACY_FLAT_KEYS.includes(rawKey)) {
+      continue
+    }
+    const value = localStorage.getItem(rawKey)
+    if (value === null) continue
+
+    const scoped = `u:${_userScope}:${rawKey}`
+    // Don't overwrite a value the user already has in their scope.
+    if (localStorage.getItem(scoped) === null) {
+      localStorage.setItem(scoped, value)
+      moved += 1
+    }
+    localStorage.removeItem(rawKey)
+  }
+  return moved
 }

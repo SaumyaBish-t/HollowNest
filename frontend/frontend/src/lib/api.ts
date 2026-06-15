@@ -107,9 +107,17 @@ export async function getSessions(): Promise<Session[]> {
   return res.json();
 }
 
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function getSession(id: string): Promise<Session> {
   const res = await authedFetch(`${API_BASE}/sessions/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch session");
+  if (!res.ok) throw new ApiError(res.status, `Failed to fetch session (${res.status})`);
   return res.json();
 }
 
@@ -185,7 +193,19 @@ export async function* streamAgentRun(params: {
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to run agent: ${res.statusText}`);
+    // FastAPI returns { detail: "..." } on HTTPException. Surface it verbatim
+    // so messages like "No API key found for 'Cerebras'. Open the model
+    // selector..." reach the user instead of a generic "Bad Request".
+    let detail = res.statusText || `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && typeof body.detail === "string") {
+        detail = body.detail;
+      }
+    } catch {
+      // Body wasn't JSON; keep the statusText fallback.
+    }
+    throw new ApiError(res.status, detail);
   }
 
   if (!res.body) throw new Error("Response body is null");

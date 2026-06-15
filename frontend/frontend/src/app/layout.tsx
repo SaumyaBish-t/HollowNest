@@ -20,10 +20,20 @@ export default function RootLayout({
           appearance={{
             variables: {
               colorPrimary: "#c8c8dc",
-              colorBackground: "#07070f",
-              colorText: "#e8e8f4",
+              colorBackground: "#0d0d1a",
+              colorText: "#f0f0fa",
+              colorTextSecondary: "#a8a8c2",
+              colorTextOnPrimaryBackground: "#0d0d1a",
+              colorNeutral: "#e8e8f4",
               colorInputBackground: "#16162a",
-              colorInputText: "#e8e8f4",
+              colorInputText: "#f0f0fa",
+              colorDanger: "#ff7a90",
+              colorSuccess: "#7adc9c",
+              colorWarning: "#f5c46b",
+              colorShimmer: "rgba(200,200,220,0.08)",
+              borderRadius: "0.75rem",
+              fontFamily: "var(--font-sans, ui-sans-serif, system-ui, sans-serif)",
+              fontSize: "0.95rem",
             },
           }}
         >

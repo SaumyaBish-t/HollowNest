@@ -439,6 +439,14 @@ async def _try_openai_model(
                         msg_copy["content"] = str(msg_copy.get("content", "")) + "\n\n[System Note: You attached some files (like images, videos, or scanned PDFs) that this specific AI provider does not support reading natively. Those files were ignored.]"
                         
                 del msg_copy["attachments"]
+
+            # Some providers (notably Ollama Cloud) reject messages whose
+            # `content` is null. OpenAI's spec allows null for assistant
+            # messages that only carry tool_calls, but we coerce to "" here
+            # so every provider receives a string.
+            if msg_copy.get("content") is None:
+                msg_copy["content"] = ""
+
             sanitized_messages.append(msg_copy)
 
         # After repeated malformed tool calls, stop sending tools so the

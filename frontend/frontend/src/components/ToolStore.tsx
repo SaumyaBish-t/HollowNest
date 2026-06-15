@@ -125,7 +125,7 @@ function ToolCard({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{meta.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 break-words">{meta.description}</p>
         </div>
 
         {!isBuiltin && !connected && (
@@ -239,13 +239,13 @@ export default function ToolStore({ isOpen, onOpenChange, onToolsChanged }: Tool
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[900px] lg:max-w-[1000px] max-h-[85vh] overflow-y-auto overflow-x-hidden bg-background border-border text-foreground">
+      <DialogContent className="!w-[95vw] !max-w-[1100px] sm:!max-w-[1100px] lg:!max-w-[1200px] max-h-[85vh] overflow-y-auto overflow-x-hidden bg-background border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <PlugZap size={24} className="text-accent" />
             Tool Store
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+          <DialogDescription className="text-muted-foreground whitespace-normal break-words">
             Connect external tools and review the agent&apos;s built-in abilities. Credentials are stored locally in your browser. Manage AI models and API keys from the model selector below the chat.
           </DialogDescription>
         </DialogHeader>

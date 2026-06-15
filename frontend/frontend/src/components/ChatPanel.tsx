@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import ProviderSelector from "./ProviderSelector";
 import VoiceButton from "@/components/VoiceButton";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
-import { streamAgentRun, updateSessionTitle, getSession, uploadFiles } from "@/lib/api";
+import { streamAgentRun, updateSessionTitle, getSession, uploadFiles, ApiError } from "@/lib/api";
 import type { Session, Message } from "@/lib/api";
 
 interface ChatPanelProps {
@@ -94,24 +94,47 @@ export default function ChatPanel({
       return;
     }
 
-    // Guard against a slow fetch for a previous session overwriting a newer one
+    // Switching sessions: keep the previous messages on screen until the new
+    // payload arrives so the chat doesn't flash empty. Guard against a slow
+    // fetch for a previous session overwriting a newer one.
     let cancelled = false;
     setIsLoadingSession(true);
-    getSession(sessionId)
-      .then((s) => {
+
+    const attemptLoad = async (retriesLeft: number): Promise<void> => {
+      try {
+        const s = await getSession(sessionId);
         if (cancelled) return;
         setSession(s);
         setMessages(s.messages || []);
         if (s.provider && s.model) {
           onProviderChange(s.provider, s.model);
         }
-      })
-      .catch((e) => {
-        if (!cancelled) console.error("Error loading session", e);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingSession(false);
-      });
+      } catch (e) {
+        if (cancelled) return;
+        // 401 usually means the Clerk token isn't attached yet (auth still
+        // hydrating after a hard refresh). Retry a couple of times before
+        // giving up so refreshing on /sessions/<id> lands on the session.
+        if (e instanceof ApiError && e.status === 401 && retriesLeft > 0) {
+          await new Promise((r) => setTimeout(r, 300));
+          if (!cancelled) await attemptLoad(retriesLeft - 1);
+          return;
+        }
+        // 404 = session belongs to a different user, was deleted, or pre-dates
+        // Clerk auth (orphan rows with user_id IS NULL). Drop the URL so the
+        // user lands on a fresh chat instead of staring at a dead state.
+        if (e instanceof ApiError && e.status === 404) {
+          window.history.replaceState({}, "", "/");
+          setSession(null);
+          setMessages([]);
+          return;
+        }
+        console.error("Error loading session", e);
+      }
+    };
+
+    attemptLoad(4).finally(() => {
+      if (!cancelled) setIsLoadingSession(false);
+    });
 
     return () => {
       cancelled = true;
@@ -260,7 +283,29 @@ export default function ChatPanel({
         }
       }
     } catch (e: any) {
-      setErrorMsg(e.message || "Failed to connect to backend");
+      // Replace the empty placeholder assistant bubble with an inline error
+      // bubble so failures (missing API key, 4xx from the backend, etc.) are
+      // visible in-context rather than tucked into a separate banner.
+      const friendly = e?.message || "Failed to connect to backend";
+      setMessages((prev) => {
+        const copy = [...prev];
+        if (copy.length && copy[copy.length - 1].role === "assistant") {
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            content: `⚠️ ${friendly}`,
+          };
+        } else {
+          copy.push({
+            id: `err_${Date.now()}`,
+            role: "assistant",
+            content: `⚠️ ${friendly}`,
+            tool_calls: [],
+            created_at: new Date().toISOString(),
+          });
+        }
+        return copy;
+      });
+      setErrorMsg(friendly);
     } finally {
       setIsStreaming(false);
       onDone();
