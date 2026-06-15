@@ -257,7 +257,7 @@ export default function NexusApp({ initialSessionId = null }: NexusAppProps) {
 
       {/* Account menu — floating top-right */}
       <div className="absolute top-3 right-4 z-50">
-        <UserButton afterSignOutUrl="/sign-in" />
+        <UserButton />
       </div>
     </div>
   );
