@@ -38,16 +38,16 @@ Why this split: FastAPI streams SSE and runs Playwright — both unhappy on serv
 
 ---
 
-## 2. Backend — Railway
+## 3. Backend — Railway
 
-### 2.1 Create service
+### 3.1 Create service
 
 1. railway.app → **New Project** → **Deploy from GitHub repo**
 2. Pick `HollowNest`
 3. Settings → **Root Directory** = `backend`
 4. Builder auto-detects the `Dockerfile` (already wired)
 
-### 2.2 Environment variables
+### 3.2 Environment variables
 
 Settings → **Variables** → paste from `backend/.env.example`:
 
@@ -65,19 +65,19 @@ Settings → **Variables** → paste from `backend/.env.example`:
 
 Railway injects `PORT` automatically — do NOT set it.
 
-### 2.3 Deploy
+### 3.3 Deploy
 
 - Push to `main` → Railway builds & deploys
-- First build takes ~5 min (Playwright image is fat)
+- First build takes ~7 min (Playwright image + fastembed BGE model bake-in)
 - Settings → **Networking** → **Generate Domain** → copy URL (e.g. `https://hollownest-production.up.railway.app`)
 - Verify: `curl https://<url>/health` → `{"status":"ok"}`
-- DB tables created automatically on boot (`python init_db.py` in the start command)
+- DB tables created automatically on boot (`python init_db.py` in the start command, idempotent `ALTER TABLE` migrations included)
 
 ---
 
-## 3. Frontend — Vercel
+## 4. Frontend — Vercel
 
-### 3.1 Import project
+### 4.1 Import project
 
 1. vercel.com → **Add New → Project** → import the GitHub repo
 2. **Root Directory** = `frontend/frontend`
@@ -85,7 +85,7 @@ Railway injects `PORT` automatically — do NOT set it.
 4. Build Command: `npm run build` (default)
 5. Output Directory: leave blank
 
-### 3.2 Environment variable
+### 4.2 Environment variables
 
 Settings → **Environment Variables**:
 
@@ -101,47 +101,62 @@ Settings → **Environment Variables**:
 
 Apply to Production + Preview + Development.
 
-### 3.3 Deploy
+### 4.3 Deploy
 
 - Click **Deploy**. ~2 min build.
 - Copy the Vercel URL (e.g. `https://hollownest.vercel.app`)
 
 ---
 
-## 4. Wire CORS
+## 5. Wire CORS + Clerk allowed origins
 
+### 5.1 Backend CORS
 Vercel `*.vercel.app` is already allowed by regex in `app/main.py`. If you attach a **custom domain**:
 
 1. Railway → backend service → Variables
 2. `CORS_ORIGINS` = `https://yourdomain.com,https://www.yourdomain.com`
 3. Redeploy
 
----
+### 5.2 Clerk allowed origins
+Clerk's frontend SDK refuses to load from origins it doesn't know.
 
-## 5. Smoke test
-
-1. Open the Vercel URL
-2. Click the model selector → paste a provider API key (or rely on server keys)
-3. Send: *"list files in workspace"* → tool call streams, result shows
-4. Try `screenshot_url` on `https://example.com` — confirms Playwright works
-5. Open a session, refresh page → session persists (Neon working)
+1. Clerk dashboard → **Configure** → **Domains**
+2. Add your Vercel URL (and custom domain if any)
+3. For production Clerk instance: create a separate **Production** application and swap to its `pk_live_...` / `sk_live_...` keys in Vercel + Railway
 
 ---
 
-## 6. Common issues
+## 6. Smoke test
+
+1. Open the Vercel URL → redirects to `/sign-in`
+2. Sign up (or sign in with Google) → land on chat
+3. Open model selector → paste a provider API key (e.g. Cerebras or Groq — both free)
+4. Send: *"hi"* → short text reply, no tool storm
+5. Send: *"list files in workspace"* → tool calls stream, results show on right panel
+6. Open a session, refresh the page → session persists (Neon + Clerk auth survives hard refresh)
+7. Sign out + sign in as a different account → previous user's keys / sessions hidden
+
+---
+
+## 7. Common issues
 
 | Symptom | Fix |
 |---|---|
 | `connection refused` to backend | `NEXT_PUBLIC_API_URL` wrong or missing `https://` |
-| CORS error in browser console | Add Vercel domain to `CORS_ORIGINS`, redeploy backend |
+| `Missing Authorization: Bearer` 401 from backend | `CLERK_JWT_ISSUER` wrong on Railway. Must match the Frontend API URL of the same Clerk instance whose `pk_...` Vercel uses |
+| Clerk SDK refuses to mount | Vercel URL not added to Clerk → Domains list |
+| CORS error in browser console | Add Vercel / custom domain to `CORS_ORIGINS`, redeploy backend |
 | `init_db.py` errors on boot | `DATABASE_URL` missing `+asyncpg` prefix or `sslmode=require` |
+| `column "user_id" does not exist` on sessions | `init_db.py` didn't run — Railway start cmd already runs it on boot; if you migrated DB by hand, run `python init_db.py` once |
 | Playwright `Executable doesn't exist` | You changed Dockerfile base image — keep `mcr.microsoft.com/playwright/python` |
+| `web_search` says no Tavily key | Expected — falls back to DuckDuckGo automatically via `ddgs` |
 | SSE stream cuts at 60s | You deployed backend to Vercel/Netlify (don't) — use Railway/Render/Fly |
 | Files written by agent vanish | `WORKSPACE_DIR=/tmp/...` is ephemeral; attach Railway Volume mounted at `/data` and set `WORKSPACE_DIR=/data/workspace` |
+| fastembed model re-downloads on every cold start | Confirm `HF_HOME=/tmp/hf_cache` in Dockerfile + Railway volume mounted at `/tmp` for persistence (optional, model is small) |
 
 ---
 
-## 7. Alternatives
+## 8. Alternatives
 
 - **Render**: same Dockerfile works. New Web Service → Docker → root `backend` → add env vars. Health check `/health`.
 - **Fly.io**: `fly launch` from `backend/`. Bigger image needs `[mounts]` or a paid VM tier (Playwright = >1GB).
@@ -149,10 +164,37 @@ Vercel `*.vercel.app` is already allowed by regex in `app/main.py`. If you attac
 
 ---
 
-## 8. Cost (free tier)
+## 9. Cost (free tier)
 
 - Neon: 0.5 GB free, sleeps after inactivity
 - Railway: $5 free credit / month — Playwright image eats ~1.5 GB so plan for ~$5–10/mo if always-on
 - Vercel: free hobby plan covers this
+- Clerk: 10,000 monthly active users on free tier (more than enough for solo / hobby)
 
 For zero-cost: swap Railway for **Render free tier** (sleeps after 15 min idle, slow cold start) or run backend on your own machine + tunnel via `cloudflared`.
+
+---
+
+## 10. Local dev quick start
+
+```bash
+# Backend
+cd backend
+python -m venv venv && venv\Scripts\activate    # or source venv/bin/activate
+pip install -r requirements.txt
+playwright install chromium
+copy .env.example .env                           # cp on macOS/Linux
+# Fill DATABASE_URL + CLERK_JWT_ISSUER at minimum.
+# For dev without Clerk: set CLERK_DISABLE_AUTH=true
+python init_db.py
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Frontend (separate terminal)
+cd frontend/frontend
+npm install
+copy .env.example .env.local                     # cp on macOS/Linux
+# Fill NEXT_PUBLIC_API_URL=http://localhost:8000 + Clerk publishable/secret keys
+npm run dev
+```
+
+Open http://localhost:3000.
